@@ -10,12 +10,7 @@
       <TargetName>Target 1</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-<<<<<<< HEAD
-      <pCCUsed>5060750::V5.06 update 6 (build 750)::ARMCC</pCCUsed>
-      <uAC6>0</uAC6>
-=======
       <pCCUsed>5060061::V5.06 update 1 (build 61)::ARMCC</pCCUsed>
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
       <TargetOption>
         <TargetCommonOption>
           <Device>LPC1768</Device>
@@ -56,11 +51,7 @@
           <OutputName>LCD_Driver</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-<<<<<<< HEAD
-          <CreateHexFile>0</CreateHexFile>
-=======
           <CreateHexFile>1</CreateHexFile>
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -134,8 +125,6 @@
             <HexOffset>0</HexOffset>
             <Oh166RecLen>16</Oh166RecLen>
           </OPTHX>
-<<<<<<< HEAD
-=======
           <Simulator>
             <UseSimulator>0</UseSimulator>
             <LoadApplicationAtStartup>1</LoadApplicationAtStartup>
@@ -177,7 +166,6 @@
             <InitializationFile></InitializationFile>
             <Driver>BIN\UL2CM3.DLL</Driver>
           </TargetDlls>
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
         </DebugOption>
         <Utilities>
           <Flash1>
@@ -376,21 +364,11 @@
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
             <uC99>1</uC99>
-<<<<<<< HEAD
-            <uGnu>1</uGnu>
-=======
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
             <useXO>0</useXO>
             <v6Lang>1</v6Lang>
             <v6LangP>1</v6LangP>
             <vShortEn>1</vShortEn>
             <vShortWch>1</vShortWch>
-<<<<<<< HEAD
-            <v6Lto>0</v6Lto>
-            <v6WtE>0</v6WtE>
-            <v6Rtti>0</v6Rtti>
-=======
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
             <VariousControls>
               <MiscControls></MiscControls>
               <Define></Define>
@@ -408,10 +386,6 @@
             <NoWarn>0</NoWarn>
             <uSurpInc>0</uSurpInc>
             <useXO>0</useXO>
-<<<<<<< HEAD
-            <uClangAs>0</uClangAs>
-=======
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
             <VariousControls>
               <MiscControls></MiscControls>
               <Define></Define>
@@ -447,8 +421,6 @@
               <FileType>1</FileType>
               <FilePath>.\src\lcd.c</FilePath>
             </File>
-<<<<<<< HEAD
-=======
             <File>
               <FileName>FontSetup.c</FileName>
               <FileType>1</FileType>
@@ -469,7 +441,6 @@
               <FileType>1</FileType>
               <FilePath>.\src\font.c</FilePath>
             </File>
->>>>>>> 9f9f39d8fb1472468bd017842a7dd3821b9406ff
           </Files>
         </Group>
         <Group>
