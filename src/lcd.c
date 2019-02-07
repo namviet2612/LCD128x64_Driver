@@ -29,9 +29,7 @@ void GLCD_Print78(uint8_t Line, uint8_t Col, char* str)            //In chuoi ky
 void GLCD_PutBMP(char *bmp)                                        //in hinh anh len GLCD
 */
 
-#include <math.h>
-#include <font.h>
-#include "LPC17xx.h"
+#include "lcd.h"
 
 #define LPC_GPIO(n)             ((LPC_GPIO_TypeDef *)(LPC_GPIO0_BASE + 0x00020*n))
 #define DIR  FIODIR
@@ -175,7 +173,15 @@ void GLCD_SetDISPLAY(uint8_t ON){
     cbi(PORT_1, GLCD_RS); //pull both RS, RW down, (AVR->GLCD)
     cbi(PORT_0, GLCD_RW);
     
-    GLCD_DATA_O=GLCD_DISPLAY+ON;
+    /* GLCD_DATA_O=GLCD_DISPLAY+ON; */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_DISPLAY+ON) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_DISPLAY+ON) & 0x01) <<  GLCD_D0;
     GLCD_ENABLE;           //Pull the EN line up
     GLCD_Delay();
     GLCD_DISABLE;           //Pull the EN line down
@@ -183,10 +189,18 @@ void GLCD_SetDISPLAY(uint8_t ON){
 void GLCD_SetYADDRESS(uint8_t Col){ //set Y address (or column) of GLCD
     wait_GLCD();
     GLCD_OUT_Set();
-    cbi(GLCD_CTRL_O, GLCD_RS); //pull both RS, RW down, (AVR->GLCD)
-    cbi(GLCD_CTRL_O, GLCD_RW);
+    cbi(PORT_1, GLCD_RS); //pull both RS, RW down, (AVR->GLCD)
+    cbi(PORT_0, GLCD_RW);
     
-    GLCD_DATA_O=GLCD_YADDRESS+Col;
+    /* GLCD_DATA_O=GLCD_YADDRESS+Col; */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_YADDRESS+Col) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_YADDRESS+Col) & 0x01) <<  GLCD_D0;
     GLCD_ENABLE;           //Pull the EN line up    
     GLCD_Delay();
     GLCD_DISABLE;           //Pull the EN line down  
@@ -195,17 +209,18 @@ void GLCD_SetYADDRESS(uint8_t Col){ //set Y address (or column) of GLCD
 void GLCD_SetXADDRESS(uint8_t Line){ //set X address (or line) of GLCD
     wait_GLCD();
     GLCD_OUT_Set();
-    cbi(GLCD_CTRL_O, GLCD_RS); //pull both RS, RW down,(AVR->GLCD)
-    cbi(GLCD_CTRL_O, GLCD_RW);
+    cbi(PORT_1, GLCD_RS); //pull both RS, RW down,(AVR->GLCD)
+    cbi(PORT_0, GLCD_RW);
 
-    GLCD_DATA_O=GLCD_XADDRESS+Line;  
-    //GLCD_DATA_O=GLCD_XADDRESS+Line;
-//    GLCD_DISABLE;           //Pull the EN line down
-//    GLCD_Delay();
-//    GLCD_ENABLE;           //Pull the EN line up  
-        
-  
-//    GLCD_DATA_O=GLCD_XADDRESS+Line;
+    /* GLCD_DATA_O=GLCD_XADDRESS+Line;   */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_XADDRESS+Line) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_XADDRESS+Line) & 0x01) <<  GLCD_D0;
     GLCD_ENABLE;           //Pull the EN line up
     GLCD_Delay();
     GLCD_DISABLE;           //Pull the EN line down      
@@ -213,23 +228,47 @@ void GLCD_SetXADDRESS(uint8_t Line){ //set X address (or line) of GLCD
 void GLCD_StartLine(uint8_t Offset){ //Set start line khi cuon GLCD
     wait_GLCD();
     GLCD_OUT_Set();
-    cbi(GLCD_CTRL_O, GLCD_RS); //pull both RS, RW down, (AVR->GLCD)
-    cbi(GLCD_CTRL_O, GLCD_RW);
+    cbi(PORT_1, GLCD_RS); //pull both RS, RW down, (AVR->GLCD)
+    cbi(PORT_0, GLCD_RW);
 
     GLCD_SetSide(0); 
-    GLCD_DATA_O=GLCD_STARTLINE+Offset;  
+    /* GLCD_DATA_O=GLCD_STARTLINE+Offset;   */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_STARTLINE+Offset) & 0x01) <<  GLCD_D0;
     GLCD_DISABLE;           //Pull the EN line down
     GLCD_Delay();
     GLCD_ENABLE;           //Pull the EN line up  
         
     GLCD_SetSide(1);    
-    GLCD_DATA_O=GLCD_STARTLINE+Offset;
+    /* GLCD_DATA_O=GLCD_STARTLINE+Offset; */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_STARTLINE+Offset) & 0x01) <<  GLCD_D0;
     GLCD_DISABLE;           //Pull the EN line down
     GLCD_Delay();
     GLCD_ENABLE;           //Pull the EN line up  
             
     GLCD_SetSide(2);
-    GLCD_DATA_O=GLCD_STARTLINE+Offset;
+    /* GLCD_DATA_O=GLCD_STARTLINE+Offset; */
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((GLCD_STARTLINE+Offset) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((GLCD_STARTLINE+Offset) & 0x01) <<  GLCD_D0;
     GLCD_DISABLE;           //Pull the EN line down
     GLCD_Delay();
     GLCD_ENABLE;           //Pull the EN line up  
@@ -243,10 +282,17 @@ void GLCD_StartLine(uint8_t Offset){ //Set start line khi cuon GLCD
 void GLCD_WriteDATA(uint8_t DATA){    
     wait_GLCD();
     GLCD_OUT_Set();
-    sbi(GLCD_CTRL_O, GLCD_RS); //pull RS up
-    cbi(GLCD_CTRL_O, GLCD_RW); //RW down,  (AVR->GLCD)
-    GLCD_DATA_O=DATA;        // Put Data out
-    
+    sbi(PORT_1, GLCD_RS); //pull RS up
+    cbi(PORT_0, GLCD_RW); //RW down,  (AVR->GLCD)
+    /* GLCD_DATA_O=DATA; */        // Put Data out
+	  LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x80) >> 7) <<  GLCD_D7;
+	  LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x40) >> 6) <<  GLCD_D6;
+		LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x20) >> 5) <<  GLCD_D5;
+	  LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x10) >> 4) <<  GLCD_D4;
+		LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x08) >> 3) <<  GLCD_D3;
+	  LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x04) >> 2) <<  GLCD_D2;
+		LPC_GPIO(PORT_1)-> SET = (((DATA) & 0x02) >> 1) <<  GLCD_D1;
+	  LPC_GPIO(PORT_1)-> SET =  ((DATA) & 0x01) <<  GLCD_D0;
     GLCD_ENABLE;           //Pull the EN line up    
     GLCD_Delay();
     GLCD_DISABLE;           //Pull the EN line down
@@ -258,12 +304,20 @@ uint8_t GLCD_ReadDATA(void){
     uint8_t DATA;
     wait_GLCD();
     GLCD_IN_Set();
-    sbi(GLCD_CTRL_O, GLCD_RS); //pull both RS up    
-    sbi(GLCD_CTRL_O, GLCD_RW); //pull both RW up, (GLCD->AVR)
+    sbi(PORT_1, GLCD_RS); //pull both RS up    
+    sbi(PORT_0, GLCD_RW); //pull both RW up, (GLCD->AVR)
     
     GLCD_ENABLE;           //Pull the EN line up
     GLCD_Delay();
-    DATA=GLCD_DATA_I;       // get Data    
+    /* DATA=GLCD_DATA_I; */       // get Data    
+	  DATA = (DATA & 0x7F) | (bit_is_set(PORT_1, GLCD_D7) << 7U);
+	  DATA = (DATA & 0xBF) | (bit_is_set(PORT_1, GLCD_D6) << 6U);
+		DATA = (DATA & 0xDF) | (bit_is_set(PORT_1, GLCD_D5) << 5U);
+	  DATA = (DATA & 0xEF) | (bit_is_set(PORT_1, GLCD_D4) << 4U);
+		DATA = (DATA & 0xF7) | (bit_is_set(PORT_1, GLCD_D3) << 3U);
+	  DATA = (DATA & 0xFB) | (bit_is_set(PORT_1, GLCD_D2) << 2U);
+		DATA = (DATA & 0xFD) | (bit_is_set(PORT_1, GLCD_D1) << 1U);
+	  DATA = (DATA & 0xFE) | bit_is_set(PORT_1, GLCD_D0);
     GLCD_DISABLE;           //Pull the EN line down
     GLCD_Delay();
 
@@ -388,7 +442,7 @@ void GLCD_PutChar_setup(uint8_t Line, uint8_t Col, uint16_t chr){
      }   
 } 
 
-void GLCD_Printf_setup(uint8_t Line, uint8_t Col,flash char* str)
+void GLCD_Printf_setup(uint8_t Line, uint8_t Col, const char* str)
 {
     uint8_t i, x;  
     uint16_t chr;
@@ -468,7 +522,7 @@ void GLCD_PutChar_prog(uint8_t Line, uint8_t Col, uint16_t chr){
      }   
 } 
 
-void GLCD_Printf_prog(uint8_t Line, uint8_t Col,flash char* str)
+void GLCD_Printf_prog(uint8_t Line, uint8_t Col,const char* str)
 {
     uint8_t i, x;  
     uint16_t chr;
@@ -499,7 +553,7 @@ void GLCD_Print_prog(uint8_t Line, uint8_t Col,char* str){
     }
 }
 //print an array of character onto GLCD----
-void GLCD_Printf78(uint8_t Line, uint8_t Col,flash char* str){
+void GLCD_Printf78(uint8_t Line, uint8_t Col,const char* str){
     uint8_t i, x;
     x=Col;
     for (i=0; str[i]!=0; i++){
