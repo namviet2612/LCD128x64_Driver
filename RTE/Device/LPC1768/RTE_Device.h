@@ -311,7 +311,7 @@
 // </e>
 
 // <e> UART0 (Universal asynchronous receiver transmitter)
-#define RTE_UART0                       0
+#define RTE_UART0                       1
 
 //   <o> UART0_TX Pin <0=>Not used <1=>P0_2
 //   <i> UART0 Serial Output pin
