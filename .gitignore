@@ -2,3 +2,6 @@ DebugConfig/
 Listings/
 Objects/
 *.uvguix.namng
+*.bak
+JLinkLog.txt
+JLinkSettings.ini

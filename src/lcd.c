@@ -94,7 +94,7 @@ void GLCD_PutBMP(char *bmp)                                        //in hinh anh
 void GLCD_Delay(void){
     uint8_t i;
     //for(i=0; i<16; i++) asm volatile ("nop"::);
-    for(i=0; i<2; i++){
+    for(i=0; i<16; i++){
         __asm("nop");
     }
 }                                                                            
@@ -164,7 +164,8 @@ void wait_GLCD(void){
     while (bit_is_set(GLCD_DATA_I,GLCD_BUSY)){
         GLCD_ENABLE;           //Pull the EN line up        
         GLCD_Delay();
-        GLCD_DISABLE;           //Pull the EN line down                        
+        GLCD_DISABLE;           //Pull the EN line down    
+		GLCD_Delay();
     }
 }
 void GLCD_SetDISPLAY(uint8_t ON){
