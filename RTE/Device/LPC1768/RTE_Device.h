@@ -311,7 +311,7 @@
 // </e>
 
 // <e> UART0 (Universal asynchronous receiver transmitter)
-#define RTE_UART0                       1
+#define RTE_UART0                       0
 
 //   <o> UART0_TX Pin <0=>Not used <1=>P0_2
 //   <i> UART0 Serial Output pin
@@ -536,11 +536,11 @@
 // </e>
 
 // <e> UART2 (Universal asynchronous receiver transmitter)
-#define RTE_UART2                       0
+#define RTE_UART2                       1
 
 //   <o> UART2_TX Pin <0=>Not used <1=>P0_10 <2=>P2_8
 //   <i> UART2 Serial Output pin
-#define RTE_UART2_TX_ID                 0
+#define RTE_UART2_TX_ID                 1
 #if    (RTE_UART2_TX_ID == 0)
 #define RTE_UART2_TX_PIN_EN             0
 #elif  (RTE_UART2_TX_ID == 1)
@@ -560,7 +560,7 @@
 
 //   <o> UART2_RX Pin <0=>Not used <1=>P0_11 <2=>P2_9
 //   <i> UART2 Serial Input pin
-#define RTE_UART2_RX_ID                 0
+#define RTE_UART2_RX_ID                 1
 #if    (RTE_UART2_RX_ID == 0)
 #define RTE_UART2_RX_PIN_EN             0
 #elif  (RTE_UART2_RX_ID == 1)
@@ -582,12 +582,12 @@
 //     <e> Tx
 //       <o1> Channel     <0=>0 <1=>1 <2=>2 <3=>3 <4=>4 <5=>5 <6=>6 <7=>7
 //     </e>
-#define   RTE_UART2_DMA_TX_EN           1
+#define   RTE_UART2_DMA_TX_EN           0
 #define   RTE_UART2_DMA_TX_CH           0
 //     <e> Rx
 //       <o1> Channel    <0=>0 <1=>1 <2=>2 <3=>3 <4=>4 <5=>5 <6=>6 <7=>7
 //     </e>
-#define   RTE_UART2_DMA_RX_EN           1
+#define   RTE_UART2_DMA_RX_EN           0
 #define   RTE_UART2_DMA_RX_CH           1
 //   </h> DMA
 
