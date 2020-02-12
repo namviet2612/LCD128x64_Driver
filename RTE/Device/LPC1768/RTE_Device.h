@@ -360,11 +360,11 @@
 
 //     </e>
 // <e> UART1 (Universal asynchronous receiver transmitter)
-#define RTE_UART1                       0
+#define RTE_UART1                       1
 
 //   <o> U1_TX Pin <0=>Not used <1=>P0_15 <2=>P2_0
 //   <i> UART1 Serial Output pin
-#define RTE_UART1_TX_ID                 1
+#define RTE_UART1_TX_ID                 2
 #if    (RTE_UART1_TX_ID == 0)
 #define RTE_UART1_TX_PIN_EN             0
 #elif  (RTE_UART1_TX_ID == 1)
@@ -384,7 +384,7 @@
 
 //   <o> U1_RX Pin <0=>Not used <1=>P0_16 <2=>P2_1
 //   <i> UART1 Serial Input pin
-#define RTE_UART1_RX_ID                 1
+#define RTE_UART1_RX_ID                 2
 #if    (RTE_UART1_RX_ID == 0)
 #define RTE_UART1_RX_PIN_EN             0
 #elif  (RTE_UART1_RX_ID == 1)
@@ -524,12 +524,12 @@
 //     <e> Tx
 //       <o1> Channel     <0=>0 <1=>1 <2=>2 <3=>3 <4=>4 <5=>5 <6=>6 <7=>7
 //     </e>
-#define   RTE_UART1_DMA_TX_EN           1
+#define   RTE_UART1_DMA_TX_EN           0
 #define   RTE_UART1_DMA_TX_CH           0
 //     <e> Rx
 //       <o1> Channel    <0=>0 <1=>1 <2=>2 <3=>3 <4=>4 <5=>5 <6=>6 <7=>7
 //     </e>
-#define   RTE_UART1_DMA_RX_EN           1
+#define   RTE_UART1_DMA_RX_EN           0
 #define   RTE_UART1_DMA_RX_CH           1
 //   </h> DMA
 

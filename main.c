@@ -2,14 +2,17 @@
 #include "Driver_USART.h"
 #include "system_LPC17xx.h"
 #include "timer.h"
+#include "math.h"
 
 /* Global variables */
 char cmd[30];
-static bool USART_TX_Complete = false;
-static bool USART_RX_Complete = false;
-static bool USART_RX_Timeout = false;
+char modbus_buffer[30];
+static bool USART_TX_Complete[2];
+static bool USART_RX_Complete[2];
+static bool USART_RX_Timeout[2];
 /* USART Driver */
 extern ARM_DRIVER_USART Driver_USART2;
+extern ARM_DRIVER_USART Driver_USART1;
 
 /* Macro and define */
 #define SIM800A_PING        "AT\r\n"
@@ -35,22 +38,25 @@ extern ARM_DRIVER_USART Driver_USART2;
     GLCD_Print78(line, 0, log);\
     }
 
-#define RESET_ALL_PARAMETER() {\
-    USART_TX_Complete = false;\
-    USART_RX_Complete = false;\
-    USART_RX_Timeout = false;\
+#define RESET_SIM800_PARAMETER() {\
+    USART_TX_Complete[0] = false;\
+    USART_RX_Complete[0] = false;\
+    USART_RX_Timeout[0] = false;\
     for (int i = 0; i < 30; i++) {\
         cmd[i] = 0x00; }\
     }
 
 /* Function prototypes */
 static void LCD_Dummy(void);
-static void USART_Init(ARM_DRIVER_USART *USARTdrv);
-static void USART_Callback(uint32_t event);
-static bool USART_SIM800_SendCommand(ARM_DRIVER_USART *USARTdrv, char *data, int length);
-static bool USART_SIM800_VerifyReceivedData(char *data, int SendCmdLength);
-bool USART_SIM800_Communication(ARM_DRIVER_USART *USARTdrv, char *dataIn, char* dataOut, int SendCmdLength);
+static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback);
+static void USART_modbus_Callback(uint32_t event);
+static void USART_sim800_Callback(uint32_t event);
+static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, char *data, int SendCmdLength);
+static bool USART_SIM800_VerifyReceivedData(char *data);
+bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength);
 void Timer0_Notification(void);
+void Timer1_Notification(void);
+float IEEE754_Converter(uint32_t input);
 
 void Timer0_Notification(void)
 {
@@ -58,13 +64,28 @@ void Timer0_Notification(void)
     TIMER_Stop(0);
     GLCD_Clr();
     CONSOLE_LOG("Receive Data from SIM800A not success", 0);
-    USART_RX_Timeout = true;
+    USART_RX_Timeout[0] = true;
+}
+
+void Timer1_Notification(void)
+{
+    /* User code */
+    TIMER_Stop(1);
+    GLCD_Clr();
+    CONSOLE_LOG("Receive Data from MODBUS not success", 0);
+    USART_RX_Timeout[1] = true;
 }
 
 int main(void)
 {
     bool returnValue;
-    static ARM_DRIVER_USART *currentUSARTdrv = &Driver_USART2;
+    static ARM_DRIVER_USART *sim800_USARTdrv = &Driver_USART2;
+    static ARM_DRIVER_USART *modBUS_USARTdrv = &Driver_USART1;
+    uint32_t VoltageRaw;
+    float VoltageValue;
+
+    char VoltageReadCommand[] ={0x01, 0x04, 0x00, 0x06, 0x00, 0x02, 0x91, 0xCA};
+    /* char VoltageReadCommand[] ={0x01, 0x08, 0x00, 0x00, 0xAA, 0x55, 0x5e, 0x94}; */
 
     SystemInit();
     SystemCoreClockUpdate();
@@ -72,29 +93,45 @@ int main(void)
     /* LCD functions */
     GLCD_Init();
     GLCD_Clr();
-    LCD_Dummy();
+    /* LCD_Dummy(); */
 
     /* USART fucntions */
-    USART_Init(currentUSARTdrv);
+    USART_Init(sim800_USARTdrv, USART_sim800_Callback);
+    USART_Init(modBUS_USARTdrv, USART_modbus_Callback);
 
     /* Timer function */
-    /* Timer0 used for setting USART RX Timeout */
+    /* Timer0 used for setting USART SIM800 RX Timeout */
     /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
     TIMER_Init(0,50000);                  /* Configure timer0 to generate 50ms(50000us) delay */
     TIMER_AttachInterrupt(0,Timer0_Notification);  /* myTimerIsr_0 will be called by TIMER0_IRQn */
 
-    returnValue = USART_SIM800_Communication(currentUSARTdrv, SIM800A_PING, cmd, SIM800A_PING_LENGTH);
-    RESET_ALL_PARAMETER();
+    /* Timer1 used for setting USART MODBUS RX Timeout */
+    /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
+    TIMER_Init(1,50000);                  /* Configure timer0 to generate 50ms(50000us) delay */
+    TIMER_AttachInterrupt(1,Timer1_Notification);  /* myTimerIsr_1 will be called by TIMER1_IRQn */
 
-    returnValue = USART_SIM800_Communication(currentUSARTdrv, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH);
-    RESET_ALL_PARAMETER();
+    returnValue = USART_Communication(modBUS_USARTdrv, 1, VoltageReadCommand, modbus_buffer, 8, 9);
+    VoltageRaw = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
+    VoltageValue = IEEE754_Converter(VoltageRaw);
 
-    returnValue = USART_SIM800_Communication(currentUSARTdrv, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH);
-    RESET_ALL_PARAMETER();
+    /* rx_length = SendCmdLength + OK_CR_LF; */
+    /* rx_length = OK_CR_LF; */
+    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
+
+    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_PING, cmd, SIM800A_PING_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
+
+    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
 
     return (0U);
 }
 
+/* For testing LCD */
 static void LCD_Dummy(void)
 {
     int counterLCD = 0;
@@ -105,10 +142,10 @@ static void LCD_Dummy(void)
     }
 }
 
-static void USART_Init(ARM_DRIVER_USART *USARTdrv)
+static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback)
 {
     /*Initialize the USART driver */
-    USARTdrv->Initialize(USART_Callback);
+    USARTdrv->Initialize(pUSART_Callback);
     /*Power up the USART peripheral */
     USARTdrv->PowerControl(ARM_POWER_FULL);
     /*Configure the USART to 9600 Bits/sec */
@@ -124,61 +161,78 @@ static void USART_Init(ARM_DRIVER_USART *USARTdrv)
     USARTdrv->Control(ARM_USART_CONTROL_RX, 1);
 }
 
-static void USART_Callback(uint32_t event)
+static void USART_sim800_Callback(uint32_t event)
 {
     if (event & ARM_USART_EVENT_SEND_COMPLETE)
     {
-        USART_TX_Complete = true;
+        USART_TX_Complete[0] = true;
     }
 
     if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
     {
         TIMER_Stop(0);
-        USART_RX_Complete = true;
+        USART_RX_Complete[0] = true;
     }
 }
 
-static bool USART_SIM800_SendCommand(ARM_DRIVER_USART *USARTdrv, char *data, int SendCmdLength)
+static void USART_modbus_Callback(uint32_t event)
+{
+    if (event & ARM_USART_EVENT_SEND_COMPLETE)
+    {
+        USART_TX_Complete[1] = true;
+    }
+
+    if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
+    {
+        TIMER_Stop(1);
+        USART_RX_Complete[1] = true;
+    }
+}
+
+static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, char *data, int SendCmdLength)
 {
     uint32_t tx_timeout = USART_TIMEOUT;
 
     USARTdrv->Send(data, SendCmdLength);
-    while ((USART_TX_Complete != true) && (tx_timeout > 0))
+    while ((USART_TX_Complete[instance] != true) && (tx_timeout > 0))
     {
         tx_timeout--;
     }
     if (tx_timeout == 0)
     {
-        GLCD_Clr();
+        /* For debugging */
+        /* GLCD_Clr();
         CONSOLE_LOG("Send Command not success", 0);
-        CONSOLE_LOG(data, 1);
+        CONSOLE_LOG(data, 1); */
         return ((bool)E_NOT_OK);
     }
 
     return ((bool)E_OK);
 }
 
-static bool USART_SIM800_VerifyReceivedData(char *data, int SendCmdLength)
+static bool USART_SIM800_VerifyReceivedData(char *data)
 {
     /* Received data should be a copied of sent command, append "\nOK\r\n" */
     /* Example: Send cmd "AT\r\n" (4 characters) */
     /*          Receive cmd "AT\r\n\nOK\r\n" (9 characters) */
 
     /* Update: Receive cmd is now always as "\r\nOK\r\n" if succesfully */
-    if (USART_RX_Complete == true)
+    if (USART_RX_Complete[0] == true)
     {
         if (data[2] != 'O')
         {
-            GLCD_Clr();
+            /* For debugging */
+            /* GLCD_Clr();
             CONSOLE_LOG("Error Data from SIM800A", 0);
-            CONSOLE_LOG(data, 1);
+            CONSOLE_LOG(data, 1); */
             return (E_NOT_OK);
         }
         else
         {
-            GLCD_Clr();
+            /* For debugging */
+            /* GLCD_Clr();
             CONSOLE_LOG("SIM800A was responsed OK!", 0);
-            CONSOLE_LOG(data, 1);
+            CONSOLE_LOG(data, 1); */
         }
     }
     else
@@ -189,33 +243,45 @@ static bool USART_SIM800_VerifyReceivedData(char *data, int SendCmdLength)
     return (E_OK);
 }
 
-bool USART_SIM800_Communication(ARM_DRIVER_USART *USARTdrv, char *dataIn, char* dataOut, int SendCmdLength)
+bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength)
 {
     bool returnValue = E_NOT_OK;
     uint8_t rx_length;
 
-    returnValue = USART_SIM800_SendCommand(USARTdrv, dataIn, SendCmdLength);
+    returnValue = USART_SendCommand(USARTdrv, instance, dataIn, SendCmdLength);
 
     if (returnValue == E_OK)
     {
         returnValue = E_NOT_OK;
 
-        /* rx_length = SendCmdLength + OK_CR_LF; */
-        rx_length = OK_CR_LF;
-        USARTdrv->Receive(dataOut, rx_length);
+        USARTdrv->Receive(dataOut, ReceiveLength);
 
         /* Start timer0 for trigger timeout if occurs */
-        TIMER_Start(0);
+        TIMER_Start(instance);
 
-        while (USART_RX_Complete != true)
+        while (USART_RX_Complete[instance] != true)
         {
-            if (USART_RX_Timeout == true)
+            if (USART_RX_Timeout[instance] == true)
             {
                 returnValue = E_NOT_OK;
                 break;
             }
         }
-        returnValue = USART_SIM800_VerifyReceivedData(dataOut, SendCmdLength);
     }
     return returnValue;
+}
+
+float IEEE754_Converter(uint32_t raw)
+{
+    uint8_t sign;
+    uint32_t mantissa;
+    int32_t exp;
+    float result;
+
+    sign = raw >> 31;                            // 0
+    mantissa = (raw & 0x7FFFFF) | 0x800000;      // 11244903
+    exp = ((raw >> 23) & 0xFF) - 127 - 23;       // -15
+    result = mantissa * pow(2.0, exp);           // 343.1672
+
+    return result;
 }

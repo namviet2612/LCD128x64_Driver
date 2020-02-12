@@ -389,6 +389,10 @@ void GLCD_Clr(void)
 //-------Print a character with 7x8 size onto GLCD-------
 void GLCD_PutChar78(uint8_t Line, uint8_t Col, uint16_t chr)
 {
+    if (chr < 32)
+    {
+        chr = 42; /* star symbol */
+    }
     uint16_t i;
     if ((Col > 57) && (Col < 64))
     {                           //there is a "jump" from left->right
@@ -500,6 +504,12 @@ void GLCD_PutChar_prog(uint8_t Line, uint8_t Col, uint16_t chr)
     uint16_t width_1 = 0;
     uint8_t width = font_ten_ct[0];
     uint8_t height = font_ten_ct[1];
+
+    if (chr < 28)
+    {
+        chr = 38; /* Star symbol */
+    }
+
     for (j = 4; j < (chr - 28); j++)
     {
         width_1 = width_1 + font_ten_ct[j];
