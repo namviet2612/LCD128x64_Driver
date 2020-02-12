@@ -10,9 +10,19 @@ char modbus_buffer[30];
 static bool USART_TX_Complete[2];
 static bool USART_RX_Complete[2];
 static bool USART_RX_Timeout[2];
+static bool MODBUS_Trigger = false;
 /* USART Driver */
 extern ARM_DRIVER_USART Driver_USART2;
 extern ARM_DRIVER_USART Driver_USART1;
+
+struct ValueToGet {
+    uint32_t RawVoltage;
+    float ConvertedVoltage;
+    uint32_t RawAmpe;
+    float ConvertedAmpe;
+    uint32_t RawPower;
+    float ConvertedPower;
+};
 
 /* Macro and define */
 #define SIM800A_PING        "AT\r\n"
@@ -46,16 +56,25 @@ extern ARM_DRIVER_USART Driver_USART1;
         cmd[i] = 0x00; }\
     }
 
+#define RESET_MODBUS_PARAMETER() {\
+    USART_TX_Complete[1] = false;\
+    USART_RX_Complete[1] = false;\
+    USART_RX_Timeout[1] = false;\
+    for (int i = 0; i < 30; i++) {\
+        modbus_buffer[i] = 0x00; }\
+    }
+
 /* Function prototypes */
 static void LCD_Dummy(void);
 static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback);
 static void USART_modbus_Callback(uint32_t event);
 static void USART_sim800_Callback(uint32_t event);
-static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, char *data, int SendCmdLength);
+static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, const char *data, int SendCmdLength);
 static bool USART_SIM800_VerifyReceivedData(char *data);
-bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength);
+bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, const char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength);
 void Timer0_Notification(void);
 void Timer1_Notification(void);
+void Timer2_Notification(void);
 float IEEE754_Converter(uint32_t input);
 
 void Timer0_Notification(void)
@@ -76,16 +95,35 @@ void Timer1_Notification(void)
     USART_RX_Timeout[1] = true;
 }
 
+void Timer2_Notification(void)
+{
+    /* User code */
+    /* Trigger reading data from MODBUS */
+    if (MODBUS_Trigger == false)
+    {
+        MODBUS_Trigger = true;
+    }
+}
+
 int main(void)
 {
     bool returnValue;
     static ARM_DRIVER_USART *sim800_USARTdrv = &Driver_USART2;
     static ARM_DRIVER_USART *modBUS_USARTdrv = &Driver_USART1;
-    uint32_t VoltageRaw;
-    float VoltageValue;
 
-    char VoltageReadCommand[] ={0x01, 0x04, 0x00, 0x06, 0x00, 0x02, 0x91, 0xCA};
-    /* char VoltageReadCommand[] ={0x01, 0x08, 0x00, 0x00, 0xAA, 0x55, 0x5e, 0x94}; */
+    struct ValueToGet phaseValue[3];
+
+    const char VoltageReadCommand[3][8] =  {{0x01, 0x04, 0x00, 0x00, 0x00, 0x02, 0x71, 0xCB},\
+                                            {0x01, 0x04, 0x00, 0x02, 0x00, 0x02, 0xD0, 0x0B},\
+                                            {0x01, 0x04, 0x00, 0x04, 0x00, 0x02, 0x30, 0x0A}};
+
+    const char AmpeReadCommand[3][8]=   {{0x01, 0x04, 0x00, 0x06, 0x00, 0x02, 0x91, 0xCA},\
+                                         {0x01, 0x04, 0x00, 0x08, 0x00, 0x02, 0xF0, 0x09},\
+                                         {0x01, 0x04, 0x00, 0x0A, 0x00, 0x02, 0x51, 0xC9}};
+
+    const char PowerReadCommand[3][8] = {{0x01, 0x04, 0x00, 0x0C, 0x00, 0x02, 0xB1, 0xC8},\
+                                         {0x01, 0x04, 0x00, 0x0E, 0x00, 0x02, 0x10, 0x08},\
+                                         {0x01, 0x04, 0x00, 0x10, 0x00, 0x02, 0x70, 0x0E}};
 
     SystemInit();
     SystemCoreClockUpdate();
@@ -110,10 +148,12 @@ int main(void)
     TIMER_Init(1,50000);                  /* Configure timer0 to generate 50ms(50000us) delay */
     TIMER_AttachInterrupt(1,Timer1_Notification);  /* myTimerIsr_1 will be called by TIMER1_IRQn */
 
-    returnValue = USART_Communication(modBUS_USARTdrv, 1, VoltageReadCommand, modbus_buffer, 8, 9);
-    VoltageRaw = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
-    VoltageValue = IEEE754_Converter(VoltageRaw);
+    /* Timer2 used for set 5s counter */
+    TIMER_Init(2,5000000);                  /* Configure timer0 to generate 5s(5000000us) delay */
+    TIMER_AttachInterrupt(2,Timer2_Notification);  /* myTimerIsr_2 will be called by TIMER2_IRQn */
+    TIMER_Start(2);
 
+    /* Init and test SIM800 coummunication */
     /* rx_length = SendCmdLength + OK_CR_LF; */
     /* rx_length = OK_CR_LF; */
     returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH, OK_CR_LF);
@@ -127,6 +167,33 @@ int main(void)
     returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF);
     returnValue = USART_SIM800_VerifyReceivedData(cmd);
     RESET_SIM800_PARAMETER();
+
+    while (1)
+    {
+        if (MODBUS_Trigger == true)
+        {
+            /* Start MODBUS reading data */
+            for (int phaseCounter = 0; phaseCounter < 3; phaseCounter++)
+            {
+                returnValue = USART_Communication(modBUS_USARTdrv, 1, &VoltageReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
+                phaseValue[phaseCounter].RawVoltage = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
+                phaseValue[phaseCounter].ConvertedVoltage = IEEE754_Converter(phaseValue[phaseCounter].RawVoltage);
+                RESET_MODBUS_PARAMETER();
+
+                returnValue = USART_Communication(modBUS_USARTdrv, 1, &AmpeReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
+                phaseValue[phaseCounter].RawAmpe = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
+                phaseValue[phaseCounter].ConvertedAmpe = IEEE754_Converter(phaseValue[phaseCounter].RawAmpe);
+                RESET_MODBUS_PARAMETER();
+
+                returnValue = USART_Communication(modBUS_USARTdrv, 1, &PowerReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
+                phaseValue[phaseCounter].RawPower = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
+                phaseValue[phaseCounter].ConvertedPower = IEEE754_Converter(phaseValue[phaseCounter].RawPower);
+                RESET_MODBUS_PARAMETER();
+
+                MODBUS_Trigger = false;
+            }
+        }
+    }
 
     return (0U);
 }
@@ -189,7 +256,7 @@ static void USART_modbus_Callback(uint32_t event)
     }
 }
 
-static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, char *data, int SendCmdLength)
+static bool USART_SendCommand(ARM_DRIVER_USART *USARTdrv, int instance, const char *data, int SendCmdLength)
 {
     uint32_t tx_timeout = USART_TIMEOUT;
 
@@ -243,10 +310,9 @@ static bool USART_SIM800_VerifyReceivedData(char *data)
     return (E_OK);
 }
 
-bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength)
+bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, const char *dataIn, char* dataOut, int SendCmdLength, int ReceiveLength)
 {
     bool returnValue = E_NOT_OK;
-    uint8_t rx_length;
 
     returnValue = USART_SendCommand(USARTdrv, instance, dataIn, SendCmdLength);
 
@@ -273,12 +339,12 @@ bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, char *dataIn,
 
 float IEEE754_Converter(uint32_t raw)
 {
-    uint8_t sign;
+    /* uint8_t sign; */
     uint32_t mantissa;
     int32_t exp;
     float result;
 
-    sign = raw >> 31;                            // 0
+    /* sign = raw >> 31;  */                           // 0
     mantissa = (raw & 0x7FFFFF) | 0x800000;      // 11244903
     exp = ((raw >> 23) & 0xFF) - 127 - 23;       // -15
     result = mantissa * pow(2.0, exp);           // 343.1672

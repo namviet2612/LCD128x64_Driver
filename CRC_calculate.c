@@ -2,10 +2,10 @@
 
 int main()
 {
-    printf("Hello World");
+    printf("Hello World\n");
     
     unsigned short int a=0xFFFF;
-    int cmd[6]={0x01, 0x04, 0x00, 0x06, 0x00, 0x02};
+    int cmd[6]={0x01, 0x04, 0x00, 0x08, 0x00, 0x02};
     int LSB;
     
     for (int i = 0; i < 6; i++)
@@ -26,7 +26,8 @@ int main()
         }
     }
     
-    printf("a = %d", a);
+    printf("a5 = %x\n", a & 0xFF);
+    printf("a6 = %x", (a & 0xFF00) >> 8);
 
     return 0;
 }
