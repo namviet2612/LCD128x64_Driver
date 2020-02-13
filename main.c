@@ -3,6 +3,7 @@
 #include "system_LPC17xx.h"
 #include "timer.h"
 #include "math.h"
+#include "string.h"
 
 /* Global variables */
 char cmd[30];
@@ -11,6 +12,7 @@ static bool USART_TX_Complete[2];
 static bool USART_RX_Complete[2];
 static bool USART_RX_Timeout[2];
 static bool MODBUS_Trigger = false;
+static bool delay_trigger_tim3 = false;
 /* USART Driver */
 extern ARM_DRIVER_USART Driver_USART2;
 extern ARM_DRIVER_USART Driver_USART1;
@@ -36,6 +38,20 @@ struct ValueToGet {
 
 #define SIM800A_SET_BAUD_9600    "AT+IPR=9600\r\n"
 #define SIM800A_SET_BAUD_9600_LENGTH      13
+
+#define SIM800A_TEXT_MODE    "AT+CMGF=1\r\n"
+#define SIM800A_TEXT_MODE_LENGTH      11
+
+#define SIM800A_MAKE_CALL   "ATD"
+#define SIM800A_MAKE_CALL_END_OF_LINE     ";\r\n"
+#define SIM800A_MAKE_CALL_LENGTH      16
+
+#define SIM800A_END_CALL   "ATH"
+#define SIM800A_MAKE_CALL_LENGTH      3
+
+#define SIM800A_MAKE_SMS    "AT+CMGS=\""
+#define SIM800A_MAKE_SMS_END_OF_LINE        "\"\r\n"
+#define SIM800A_MAKE_SMS_LENGTH      22
 
 #define OK_CR_LF            6    /* "\r\nOK\r\n" */
 
@@ -75,8 +91,22 @@ bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, const char *d
 void Timer0_Notification(void);
 void Timer1_Notification(void);
 void Timer2_Notification(void);
+void Timer3_Notification(void);
+void Delay_ms (uint16_t ms);
 float IEEE754_Converter(uint32_t input);
 
+void Delay_ms(uint16_t ms)
+{
+    uint32_t us;
+
+    us = ms * 1000;
+    delay_trigger_tim3 = false;
+
+    TIMER_SetTime(3, us);
+    TIMER_Start(3);
+    while (delay_trigger_tim3 != true);
+    TIMER_Stop(3);
+}
 void Timer0_Notification(void)
 {
     /* User code */
@@ -105,6 +135,15 @@ void Timer2_Notification(void)
     }
 }
 
+void Timer3_Notification(void)
+{
+    /* User code */
+    if (delay_trigger_tim3 == false)
+    {
+        delay_trigger_tim3 = true;
+    }
+}
+
 int main(void)
 {
     bool returnValue;
@@ -124,6 +163,13 @@ int main(void)
     const char PowerReadCommand[3][8] = {{0x01, 0x04, 0x00, 0x0C, 0x00, 0x02, 0xB1, 0xC8},\
                                          {0x01, 0x04, 0x00, 0x0E, 0x00, 0x02, 0x10, 0x08},\
                                          {0x01, 0x04, 0x00, 0x10, 0x00, 0x02, 0x70, 0x0E}};
+
+    char TestString[] = "Test!";
+    char EndOfTestString[1] = {0x1A};
+    char PhoneNumber[10] = "0989641473";
+    char Make_Call_String[17];
+    char Make_Sms_String[23];
+
 
     SystemInit();
     SystemCoreClockUpdate();
@@ -145,13 +191,17 @@ int main(void)
 
     /* Timer1 used for setting USART MODBUS RX Timeout */
     /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
-    TIMER_Init(1,50000);                  /* Configure timer0 to generate 50ms(50000us) delay */
+    TIMER_Init(1,50000);                  /* Configure timer1 to generate 50ms(50000us) delay */
     TIMER_AttachInterrupt(1,Timer1_Notification);  /* myTimerIsr_1 will be called by TIMER1_IRQn */
 
     /* Timer2 used for set 5s counter */
-    TIMER_Init(2,5000000);                  /* Configure timer0 to generate 5s(5000000us) delay */
+    TIMER_Init(2,5000000);                  /* Configure timer2 to generate 5s(5000000us) delay */
     TIMER_AttachInterrupt(2,Timer2_Notification);  /* myTimerIsr_2 will be called by TIMER2_IRQn */
     TIMER_Start(2);
+
+    /* Timer3 used for handle SIM800 delay */
+    TIMER_Init(3,2000000);                  /* Configure timer3 to generate 2s(2000000us) delay */
+    TIMER_AttachInterrupt(3,Timer3_Notification);  /* myTimerIsr_3 will be called by TIMER3_IRQn */
 
     /* Init and test SIM800 coummunication */
     /* rx_length = SendCmdLength + OK_CR_LF; */
@@ -159,14 +209,45 @@ int main(void)
     returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH, OK_CR_LF);
     returnValue = USART_SIM800_VerifyReceivedData(cmd);
     RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
 
     returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_PING, cmd, SIM800A_PING_LENGTH, OK_CR_LF);
     returnValue = USART_SIM800_VerifyReceivedData(cmd);
     RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
 
     returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF);
     returnValue = USART_SIM800_VerifyReceivedData(cmd);
     RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
+
+    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, cmd, SIM800A_TEXT_MODE_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
+
+    /* strcpy(Make_Call_String, SIM800A_MAKE_CALL);
+    strcat(Make_Call_String, PhoneNumber);
+    strcat(Make_Call_String, SIM800A_MAKE_CALL_END_OF_LINE);
+    returnValue = USART_Communication(sim800_USARTdrv, 0, Make_Call_String, cmd, SIM800A_MAKE_CALL_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
+    Delay_ms(2000); */
+
+    strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
+    strcat(Make_Sms_String, PhoneNumber);
+    strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
+    returnValue = USART_Communication(sim800_USARTdrv, 0, Make_Sms_String, cmd, SIM800A_MAKE_SMS_LENGTH, OK_CR_LF);
+    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
+
+    returnValue = USART_Communication(sim800_USARTdrv, 0, TestString, cmd, 5, OK_CR_LF);
+    returnValue = USART_Communication(sim800_USARTdrv, 0, EndOfTestString, cmd, 1, OK_CR_LF);
+    RESET_SIM800_PARAMETER();
+    Delay_ms(2000);
+
+
 
     while (1)
     {
