@@ -15,6 +15,7 @@
 #define MASK FIOMASK
 #define PORT_0 0
 #define PORT_1 1
+#define PORT_3 3
 #define GLCD_DATA_O PORT_1
 #define GLCD_DATA_I PORT_1
 

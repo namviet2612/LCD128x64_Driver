@@ -14,6 +14,7 @@ static bool USART_TX_Complete[2];
 static bool USART_RX_Complete[2];
 static bool USART_RX_Timeout[2];
 static bool MODBUS_Trigger = false;
+static uint8_t Display_Blink = 0;
 static bool delay_trigger_tim3 = false;
 /* USART Driver */
 extern ARM_DRIVER_USART Driver_USART2;
@@ -89,6 +90,22 @@ typedef struct ValueToGet {
 #define RELAY_CLOSE(pin) LPC_GPIO(PORT_0)->CLR |= (1UL << pin)
 #define RELAY_OPEN(pin) LPC_GPIO(PORT_0)->SET |= (1UL << pin)
 
+#define BUT1    28  /* P0.28 */
+#define BUT2    27  /* P0.27 */
+#define BUT3    26  /* P3.26 */
+#define BUT4    25  /* P3.25 */
+#define BUT5    29  /* P0.29 */
+#define BUT6    30  /* P0.30 */
+
+#define BUTTON_PIN_INIT() { \
+    LPC_GPIO(PORT_0)->DIR &= (~((1UL << BUT1) | (1UL << BUT2) | (1UL << BUT5) | (1UL << BUT6))); \
+    LPC_GPIO(PORT_3)->DIR &= (~((1UL << BUT3) | (1UL << BUT4))); \
+    }
+
+#define BUTTON_IS_PUSHED(port_num, pin_num) (LPC_GPIO(port_num)->PIN & (1UL << pin_num) ? (0) : (1))
+
+#define MAXIMUM_AMPE    30
+
 /* Function prototypes */
 static void LCD_Dummy(void);
 static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback);
@@ -122,11 +139,14 @@ void Delay_ms(uint16_t ms)
 void Timer0_Notification(void)
 {
     /* User code */
-    TIMER_Stop(0);
+    /* TIMER_Stop(0); */
     /* For debugging */
     /* GLCD_Clr();
     CONSOLE_LOG("No data from SIM800A", 3); */
-    USART_RX_Timeout[0] = true;
+    /* USART_RX_Timeout[0] = true; */
+
+    /* Chaging code: TIMER 0 is now for display blinking */
+    Display_Blink++;
 }
 
 void Timer1_Notification(void)
@@ -178,13 +198,19 @@ int main(void)
                                          {0x01, 0x04, 0x00, 0x0E, 0x00, 0x02, 0x10, 0x08},\
                                          {0x01, 0x04, 0x00, 0x10, 0x00, 0x02, 0x70, 0x0E}};
 
-    char TestString[] = "Test!";
+    char TestString[] = "TB:Thiet bi qua tai!";
     char EndOfTestString[1] = {0x1A};
     char PhoneNumber[10] = "0973569162";
     char Make_Call_String[17];
     char Make_Sms_String[23];
-    float MaximumAmpe = 5.0;
+    uint8_t MaximumAmpe = 5;
+    char RawMaximumAmpe[5];
 
+    bool PhoneNumberSetting = false;
+    bool AmpeMaxSetting = false;
+    uint8_t ModeSetting = 0;
+    uint8_t currentCursor;
+    uint8_t currentDigit;
 
     SystemInit();
     SystemCoreClockUpdate();
@@ -193,6 +219,9 @@ int main(void)
     RELAY_PIN_INIT();
     RELAY_OPEN(RELAY0);
     RELAY_OPEN(RELAY1);
+
+    /* Init button */
+    BUTTON_PIN_INIT();
 
     /* LCD functions */
     GLCD_Init();
@@ -206,9 +235,8 @@ int main(void)
     USART_Init(modBUS_USARTdrv, USART_modbus_Callback);
 
     /* Timer function */
-    /* Timer0 used for setting USART SIM800 RX Timeout */
-    /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
-    TIMER_Init(0,50000);                  /* Configure timer0 to generate 50ms(50000us) delay */
+    /* Timer0 used for display blinking implementation */
+    TIMER_Init(0,500000);                  /* Configure timer0 to generate 500ms(500000us) delay */
     TIMER_AttachInterrupt(0,Timer0_Notification);  /* myTimerIsr_0 will be called by TIMER0_IRQn */
 
     /* Timer1 used for setting USART MODBUS RX Timeout */
@@ -228,23 +256,26 @@ int main(void)
     /* Init and test SIM800 coummunication */
     /* rx_length = SendCmdLength + OK_CR_LF; */
     /* rx_length = OK_CR_LF; */
-    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH, OK_CR_LF);
-    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, cmd, SIM800A_ECHO_OFF_LENGTH, OK_CR_LF); */
+    returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_ECHO_OFF, SIM800A_ECHO_OFF_LENGTH);
+    /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
     RESET_SIM800_PARAMETER();
     Delay_ms(2000);
 
-    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_PING, cmd, SIM800A_PING_LENGTH, OK_CR_LF);
-    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_PING, cmd, SIM800A_PING_LENGTH, OK_CR_LF); */
+    /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
     RESET_SIM800_PARAMETER();
     Delay_ms(2000);
 
-    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF);
-    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF); */
+    returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, SIM800A_SET_BAUD_9600_LENGTH);
+    /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
     RESET_SIM800_PARAMETER();
     Delay_ms(2000);
 
-    returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, cmd, SIM800A_TEXT_MODE_LENGTH, OK_CR_LF);
-    returnValue = USART_SIM800_VerifyReceivedData(cmd);
+    /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, cmd, SIM800A_TEXT_MODE_LENGTH, OK_CR_LF); */
+    returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, SIM800A_TEXT_MODE_LENGTH);
+    /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
     RESET_SIM800_PARAMETER();
     Delay_ms(2000);
 
@@ -256,20 +287,9 @@ int main(void)
     RESET_SIM800_PARAMETER();
     Delay_ms(2000); */
 
-    strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
-    strcat(Make_Sms_String, PhoneNumber);
-    strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
-    returnValue = USART_Communication(sim800_USARTdrv, 0, Make_Sms_String, cmd, SIM800A_MAKE_SMS_LENGTH, OK_CR_LF);
-    returnValue = USART_SIM800_VerifyReceivedData(cmd);
-    RESET_SIM800_PARAMETER();
-    Delay_ms(2000);
-
-    returnValue = USART_Communication(sim800_USARTdrv, 0, TestString, cmd, 5, OK_CR_LF);
-    returnValue = USART_Communication(sim800_USARTdrv, 0, EndOfTestString, cmd, 1, OK_CR_LF);
-    RESET_SIM800_PARAMETER();
-    Delay_ms(2000);
-
     GLCD_Clr_Line(1);
+    sprintf(RawMaximumAmpe, "%d", MaximumAmpe);
+
     for (int i = 0; i < 3; i++)
     {
         phaseValue[i].id = i;
@@ -277,6 +297,162 @@ int main(void)
 
     while (1)
     {
+        if (BUTTON_IS_PUSHED(PORT_0, BUT1))
+        {
+            while(BUTTON_IS_PUSHED(PORT_0, BUT1));
+            GLCD_Print78(5, 0, "SDT:");
+            GLCD_Print78(5, 40, PhoneNumber);
+            GLCD_Print78(6, 0, "Amax:");
+            GLCD_Print78(6, 48, RawMaximumAmpe);
+            GLCD_Print78(6, 64, "A");
+            currentCursor = 40;
+            TIMER_Start(0);
+            ModeSetting++;
+            if (ModeSetting == 1)
+            {
+                PhoneNumberSetting = true;
+                AmpeMaxSetting = false;
+            }
+            else if (ModeSetting == 2)
+            {
+                PhoneNumberSetting = false;
+                AmpeMaxSetting = true;
+            }
+            else
+            {
+                ModeSetting = 0;
+            }
+        }
+
+        if (BUTTON_IS_PUSHED(PORT_3, BUT3))
+        {
+            while(BUTTON_IS_PUSHED(PORT_3, BUT3));
+            if ((PhoneNumberSetting == true) || (AmpeMaxSetting == true))
+            {
+                TIMER_Stop(0);
+                Display_Blink = 0;
+                currentCursor = 40;     /* Reset to first digit position */
+                currentDigit = 0;
+                GLCD_Print78(5, 40, PhoneNumber);
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+                GLCD_Print78(7, 0, "Da luu!");
+                PhoneNumberSetting = false;
+                AmpeMaxSetting = false;
+                ModeSetting = 0;
+                Delay_ms(1000);
+                GLCD_Clr_Line(5);
+                GLCD_Clr_Line(6);
+                GLCD_Clr_Line(7);
+            }
+        }
+
+        if (BUTTON_IS_PUSHED(PORT_0, BUT2))
+        {
+            while(BUTTON_IS_PUSHED(PORT_0, BUT2));
+            if (PhoneNumberSetting == true)
+            {
+                GLCD_Print78(5, 40, PhoneNumber);
+                currentCursor+=8;
+                if (currentCursor == 120) /* Reach highest digit position */
+                {
+                    currentCursor = 40; /* First digit position */
+                }
+            }
+        }
+
+        if (BUTTON_IS_PUSHED(PORT_3, BUT4))
+        {
+            while(BUTTON_IS_PUSHED(PORT_3, BUT4));
+            if (PhoneNumberSetting == true)
+            {
+                GLCD_Print78(5, 40, PhoneNumber);
+                currentCursor-=8;
+                if (currentCursor == 32) /* Reach lowest digit position */
+                {
+                    currentCursor = 112; /* Last digit position */
+                }
+            }
+        }
+
+        if (BUTTON_IS_PUSHED(PORT_0, BUT5))
+        {
+            while(BUTTON_IS_PUSHED(PORT_0, BUT5));
+            if (PhoneNumberSetting == true)
+            {
+                GLCD_Print78(5, 40, PhoneNumber);
+                PhoneNumber[currentDigit]++;
+                if (PhoneNumber[currentDigit] == 0x3A)   /* Reach above range of 0-9 */
+                {
+                    PhoneNumber[currentDigit] = '0';
+                }
+            }
+            if (AmpeMaxSetting == true)
+            {
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+                MaximumAmpe++;
+                if (MaximumAmpe == MAXIMUM_AMPE+1)
+                {
+                    MaximumAmpe = 1;
+                }
+                sprintf(RawMaximumAmpe, "%d", MaximumAmpe);
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+            }
+        }
+
+        if (BUTTON_IS_PUSHED(PORT_0, BUT6))
+        {
+            while(BUTTON_IS_PUSHED(PORT_0, BUT6));
+            if (PhoneNumberSetting == true)
+            {
+                GLCD_Print78(5, 40, PhoneNumber);
+                PhoneNumber[currentDigit]--;
+                if (PhoneNumber[currentDigit] == 0x2F)   /* Reach below range of 0-9 */
+                {
+                    PhoneNumber[currentDigit] = '9';
+                }
+            }
+            if (AmpeMaxSetting == true)
+            {
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+                MaximumAmpe--;
+                if (MaximumAmpe == 0)
+                {
+                    MaximumAmpe = MAXIMUM_AMPE;
+                }
+                sprintf(RawMaximumAmpe, "%d", MaximumAmpe);
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+            }
+        }
+
+        if (PhoneNumberSetting == true)
+        {
+            /* Re-appending ampe setting */
+            GLCD_Print78(6, 48, RawMaximumAmpe);
+            currentDigit = (currentCursor - 40)/8;
+            if (Display_Blink%2 != 0)
+            {
+                GLCD_Print78(5, currentCursor, " ");
+            }
+            else
+            {
+                GLCD_Print78(5, currentCursor, &PhoneNumber[currentDigit]);
+            }
+        }
+
+        if (AmpeMaxSetting == true)
+        {
+            /* Re-appending phone number setting */
+            GLCD_Print78(5, 40, PhoneNumber);
+            if (Display_Blink%2 != 0)
+            {
+                GLCD_Print78(6, 48, "  ");
+            }
+            else
+            {
+                GLCD_Print78(6, 48, RawMaximumAmpe);
+            }
+        }
+
         if (MODBUS_Trigger == true)
         {
             /* Start MODBUS reading data */
@@ -290,10 +466,21 @@ int main(void)
                 returnValue = USART_Communication(modBUS_USARTdrv, 1, &AmpeReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
                 phaseValue[phaseCounter].RawAmpe = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
                 phaseValue[phaseCounter].ConvertedAmpe = IEEE754_Converter(phaseValue[phaseCounter].RawAmpe);
-                if (phaseValue[phaseCounter].ConvertedAmpe > MaximumAmpe)
+                if (phaseValue[phaseCounter].ConvertedAmpe > (float)MaximumAmpe)
                 {
                     /* Close Relay here */
                     RELAY_CLOSE(RELAY0);
+                    /* Send SMS here */
+                    strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
+                    strcat(Make_Sms_String, PhoneNumber);
+                    strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
+                    returnValue = USART_SendCommand(sim800_USARTdrv, 0, Make_Sms_String, SIM800A_MAKE_SMS_LENGTH);
+                    RESET_SIM800_PARAMETER();
+                    Delay_ms(2000);
+
+                    returnValue = USART_SendCommand(sim800_USARTdrv, 0, TestString, 21);
+                    returnValue = USART_SendCommand(sim800_USARTdrv, 0, EndOfTestString, 1);
+                    RESET_SIM800_PARAMETER();
                 }
                 RESET_MODBUS_PARAMETER();
 
