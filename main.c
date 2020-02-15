@@ -4,6 +4,8 @@
 #include "timer.h"
 #include "math.h"
 #include "string.h"
+#include "stdlib.h"
+#include "stdio.h"
 
 /* Global variables */
 char cmd[30];
@@ -17,14 +19,15 @@ static bool delay_trigger_tim3 = false;
 extern ARM_DRIVER_USART Driver_USART2;
 extern ARM_DRIVER_USART Driver_USART1;
 
-struct ValueToGet {
+typedef struct ValueToGet {
+    uint8_t id;
     uint32_t RawVoltage;
     float ConvertedVoltage;
     uint32_t RawAmpe;
     float ConvertedAmpe;
     uint32_t RawPower;
     float ConvertedPower;
-};
+} ValueToGet;
 
 /* Macro and define */
 #define SIM800A_PING        "AT\r\n"
@@ -47,7 +50,7 @@ struct ValueToGet {
 #define SIM800A_MAKE_CALL_LENGTH      16
 
 #define SIM800A_END_CALL   "ATH"
-#define SIM800A_MAKE_CALL_LENGTH      3
+#define SIM800A_END_CALL_LENGTH      3
 
 #define SIM800A_MAKE_SMS    "AT+CMGS=\""
 #define SIM800A_MAKE_SMS_END_OF_LINE        "\"\r\n"
@@ -80,6 +83,12 @@ struct ValueToGet {
         modbus_buffer[i] = 0x00; }\
     }
 
+#define RELAY0  2   /* P0.2 */
+#define RELAY1  3   /* P0.3 */
+#define RELAY_PIN_INIT() LPC_GPIO(PORT_0)->DIR |= (1UL << RELAY0) | (1UL << RELAY1)
+#define RELAY_CLOSE(pin) LPC_GPIO(PORT_0)->CLR |= (1UL << pin)
+#define RELAY_OPEN(pin) LPC_GPIO(PORT_0)->SET |= (1UL << pin)
+
 /* Function prototypes */
 static void LCD_Dummy(void);
 static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback);
@@ -94,6 +103,9 @@ void Timer2_Notification(void);
 void Timer3_Notification(void);
 void Delay_ms (uint16_t ms);
 float IEEE754_Converter(uint32_t input);
+void LCD_DisplayData(uint8_t line, ValueToGet phase);
+static void GetDisplayData(ValueToGet phase, char* pDisplayBuffer);
+static uint8_t getFraction(float value);
 
 void Delay_ms(uint16_t ms)
 {
@@ -111,8 +123,9 @@ void Timer0_Notification(void)
 {
     /* User code */
     TIMER_Stop(0);
-    GLCD_Clr();
-    CONSOLE_LOG("Receive Data from SIM800A not success", 0);
+    /* For debugging */
+    /* GLCD_Clr();
+    CONSOLE_LOG("No data from SIM800A", 3); */
     USART_RX_Timeout[0] = true;
 }
 
@@ -120,8 +133,9 @@ void Timer1_Notification(void)
 {
     /* User code */
     TIMER_Stop(1);
-    GLCD_Clr();
-    CONSOLE_LOG("Receive Data from MODBUS not success", 0);
+    /* For debugging */
+    /* GLCD_Clr();
+    CONSOLE_LOG("No data from MODBUS", 4); */
     USART_RX_Timeout[1] = true;
 }
 
@@ -166,18 +180,26 @@ int main(void)
 
     char TestString[] = "Test!";
     char EndOfTestString[1] = {0x1A};
-    char PhoneNumber[10] = "0989641473";
+    char PhoneNumber[10] = "0973569162";
     char Make_Call_String[17];
     char Make_Sms_String[23];
+    float MaximumAmpe = 5.0;
 
 
     SystemInit();
     SystemCoreClockUpdate();
 
+    /* Init and open all relays */
+    RELAY_PIN_INIT();
+    RELAY_OPEN(RELAY0);
+    RELAY_OPEN(RELAY1);
+
     /* LCD functions */
     GLCD_Init();
     GLCD_Clr();
     /* LCD_Dummy(); */
+    GLCD_Print78(0, 0, "Bo dieu khien trung tam");
+    GLCD_Print78(1, 0, "Dang khoi tao...");
 
     /* USART fucntions */
     USART_Init(sim800_USARTdrv, USART_sim800_Callback);
@@ -247,7 +269,11 @@ int main(void)
     RESET_SIM800_PARAMETER();
     Delay_ms(2000);
 
-
+    GLCD_Clr_Line(1);
+    for (int i = 0; i < 3; i++)
+    {
+        phaseValue[i].id = i;
+    }
 
     while (1)
     {
@@ -264,15 +290,22 @@ int main(void)
                 returnValue = USART_Communication(modBUS_USARTdrv, 1, &AmpeReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
                 phaseValue[phaseCounter].RawAmpe = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
                 phaseValue[phaseCounter].ConvertedAmpe = IEEE754_Converter(phaseValue[phaseCounter].RawAmpe);
+                if (phaseValue[phaseCounter].ConvertedAmpe > MaximumAmpe)
+                {
+                    /* Close Relay here */
+                    RELAY_CLOSE(RELAY0);
+                }
                 RESET_MODBUS_PARAMETER();
 
-                returnValue = USART_Communication(modBUS_USARTdrv, 1, &PowerReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
+                /* returnValue = USART_Communication(modBUS_USARTdrv, 1, &PowerReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
                 phaseValue[phaseCounter].RawPower = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
                 phaseValue[phaseCounter].ConvertedPower = IEEE754_Converter(phaseValue[phaseCounter].RawPower);
-                RESET_MODBUS_PARAMETER();
+                RESET_MODBUS_PARAMETER(); */
 
-                MODBUS_Trigger = false;
+                LCD_DisplayData(phaseCounter + 1, phaseValue[phaseCounter]);
             }
+
+            MODBUS_Trigger = false;
         }
     }
 
@@ -425,10 +458,35 @@ float IEEE754_Converter(uint32_t raw)
     int32_t exp;
     float result;
 
-    /* sign = raw >> 31;  */                           // 0
-    mantissa = (raw & 0x7FFFFF) | 0x800000;      // 11244903
-    exp = ((raw >> 23) & 0xFF) - 127 - 23;       // -15
-    result = mantissa * pow(2.0, exp);           // 343.1672
+    mantissa = (raw & 0x7FFFFF) | 0x800000;
+    exp = ((raw >> 23) & 0xFF) - 127 - 23;
+    result = mantissa * pow(2.0, exp);
 
     return result;
+}
+
+void LCD_DisplayData(uint8_t line, ValueToGet phase)
+{
+    char DisplayBuffer[20];
+
+    GetDisplayData(phase, DisplayBuffer);
+    GLCD_Print78(line, 0, DisplayBuffer);
+}
+
+static uint8_t getFraction(float value)
+{
+    uint16_t tmpInt1 = (uint16_t)value;
+    float tmpFrac = value - tmpInt1;
+    uint8_t tmpInt2 = trunc(tmpFrac * 10);
+
+    return tmpInt2;
+}
+
+static void GetDisplayData(ValueToGet phase, char* pDisplayBuffer)
+{
+    sprintf(pDisplayBuffer, "O%d: %03dV %02d.%01dA", \
+    phase.id, \
+    (uint16_t)phase.ConvertedVoltage, \
+    (uint16_t)phase.ConvertedAmpe, \
+    getFraction(phase.ConvertedAmpe));
 }

@@ -31,12 +31,6 @@ void GLCD_PutBMP(char *bmp)                                        //in hinh anh
 
 #include "lcd.h"
 
-#define LPC_GPIO(n) ((LPC_GPIO_TypeDef *)(LPC_GPIO0_BASE + 0x00020 * n))
-#define DIR FIODIR
-#define SET FIOSET
-#define CLR FIOCLR
-#define PIN FIOPIN
-#define MASK FIOMASK
 /* #define _BV(b)    (1<<(b)) */
 /* #define bit_is_set(sfr, b)  (sfr & (1<<b)) */
 #define bit_is_set(port_num, pin_num) ((LPC_GPIO(port_num)->PIN & (1UL << pin_num)) ? (1) : (0))
@@ -69,11 +63,6 @@ void GLCD_PutBMP(char *bmp)                                        //in hinh anh
 #define GLCD_RS 29  // Register select: Data/Instruction (DI)
 #define GLCD_CS1 28 // left/right selecting line#1
 #define GLCD_CS2 27 // left/right selecting line#2
-
-#define PORT_0 0
-#define PORT_1 1
-#define GLCD_DATA_O PORT_1
-#define GLCD_DATA_I PORT_1
 
 //define the macro to enable/disable GLCD
 #define GLCD_ENABLE cbi(PORT_0, GLCD_E)
@@ -386,6 +375,23 @@ void GLCD_Clr(void)
             GLCD_WriteDATA(0);
     }
 }
+
+void GLCD_Clr_Line(uint8_t Line)
+{
+    uint8_t Col;
+    GLCD_GotoXY(Line, 0);
+    for (Col = 0; Col < 64; Col++)
+        GLCD_WriteDATA(0);
+
+    GLCD_GotoXY(Line, 64);
+    for (Col = 0; Col < 64; Col++)
+        GLCD_WriteDATA(0);
+
+    GLCD_GotoXY(Line, 128);
+    for (Col = 0; Col < 64; Col++)
+        GLCD_WriteDATA(0);
+}
+
 //-------Print a character with 7x8 size onto GLCD-------
 void GLCD_PutChar78(uint8_t Line, uint8_t Col, uint16_t chr)
 {
