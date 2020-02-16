@@ -105,7 +105,7 @@ typedef struct ValueToGet {
 
 #define BUTTON_IS_PUSHED(port_num, pin_num) (LPC_GPIO(port_num)->PIN & (1UL << pin_num) ? (0) : (1))
 
-#define MAXIMUM_AMPE    30
+#define MAXIMUM_AMPE    50
 
 #define WDT_WDMOD_WDEN  0
 #define WDT_WDMOD_WDRESET  1
