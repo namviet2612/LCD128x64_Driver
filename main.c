@@ -87,6 +87,7 @@ typedef struct ValueToGet {
 #define RELAY0  2   /* P0.2 */
 #define RELAY1  3   /* P0.3 */
 #define RELAY_PIN_INIT() LPC_GPIO(PORT_0)->DIR |= (1UL << RELAY0) | (1UL << RELAY1)
+/* RELAY_CLOSE: dong ro-le (tich cuc muc thap), RELAY_OPEN: ngat ro-le (muc cao) */
 #define RELAY_CLOSE(pin) LPC_GPIO(PORT_0)->CLR |= (1UL << pin)
 #define RELAY_OPEN(pin) LPC_GPIO(PORT_0)->SET |= (1UL << pin)
 
@@ -106,6 +107,9 @@ typedef struct ValueToGet {
 
 #define MAXIMUM_AMPE    30
 
+#define WDT_WDMOD_WDEN  0
+#define WDT_WDMOD_WDRESET  1
+
 /* Function prototypes */
 static void LCD_Dummy(void);
 static void USART_Init(ARM_DRIVER_USART *USARTdrv, ARM_USART_SignalEvent_t pUSART_Callback);
@@ -123,6 +127,9 @@ float IEEE754_Converter(uint32_t input);
 void LCD_DisplayData(uint8_t line, ValueToGet phase);
 static void GetDisplayData(ValueToGet phase, char* pDisplayBuffer);
 static uint8_t getFraction(float value);
+void WDG_Init(uint16_t msTimer);
+void WDG_Reload(void);
+void WDG_Disable(void);
 
 void Delay_ms(uint16_t ms)
 {
@@ -167,6 +174,8 @@ void Timer2_Notification(void)
     {
         MODBUS_Trigger = true;
     }
+    /* Timer2 also used to reset WDG counter */
+    WDG_Reload();
 }
 
 void Timer3_Notification(void)
@@ -212,23 +221,21 @@ int main(void)
     uint8_t currentCursor;
     uint8_t currentDigit;
 
+    bool OverloadBit = false;
+
     SystemInit();
     SystemCoreClockUpdate();
 
-    /* Init and open all relays */
+    /* Init and close all relays */
     RELAY_PIN_INIT();
-    RELAY_OPEN(RELAY0);
-    RELAY_OPEN(RELAY1);
+    RELAY_CLOSE(RELAY0);
+    RELAY_CLOSE(RELAY1);
 
     /* Init button */
     BUTTON_PIN_INIT();
 
-    /* LCD functions */
-    GLCD_Init();
-    GLCD_Clr();
-    /* LCD_Dummy(); */
-    GLCD_Print78(0, 0, "Bo dieu khien trung tam");
-    GLCD_Print78(1, 0, "Dang khoi tao...");
+    //WDG_Disable();
+    WDG_Init(10000);
 
     /* USART fucntions */
     USART_Init(sim800_USARTdrv, USART_sim800_Callback);
@@ -253,6 +260,14 @@ int main(void)
     TIMER_Init(3,2000000);                  /* Configure timer3 to generate 2s(2000000us) delay */
     TIMER_AttachInterrupt(3,Timer3_Notification);  /* myTimerIsr_3 will be called by TIMER3_IRQn */
 
+    /* LCD functions */
+    GLCD_Init();
+    GLCD_Clr();
+    Delay_ms(500);
+    /* LCD_Dummy(); */
+    GLCD_Print78(0, 0, "Bo dieu khien trung tam");
+    GLCD_Print78(1, 0, "Dang khoi tao...");
+
     /* Init and test SIM800 coummunication */
     /* rx_length = SendCmdLength + OK_CR_LF; */
     /* rx_length = OK_CR_LF; */
@@ -264,8 +279,8 @@ int main(void)
 
     /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_PING, cmd, SIM800A_PING_LENGTH, OK_CR_LF); */
     /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
-    RESET_SIM800_PARAMETER();
-    Delay_ms(2000);
+    /* RESET_SIM800_PARAMETER();
+    Delay_ms(2000); */
 
     /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, cmd, SIM800A_SET_BAUD_9600_LENGTH, OK_CR_LF); */
     returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_SET_BAUD_9600, SIM800A_SET_BAUD_9600_LENGTH);
@@ -343,6 +358,13 @@ int main(void)
                 GLCD_Clr_Line(5);
                 GLCD_Clr_Line(6);
                 GLCD_Clr_Line(7);
+            }
+            /* Re-setting relay here */
+            if (OverloadBit == true)
+            {
+                OverloadBit = false;
+                GLCD_Clr_Line(4);
+                RELAY_CLOSE(RELAY0);
             }
         }
 
@@ -468,8 +490,10 @@ int main(void)
                 phaseValue[phaseCounter].ConvertedAmpe = IEEE754_Converter(phaseValue[phaseCounter].RawAmpe);
                 if (phaseValue[phaseCounter].ConvertedAmpe > (float)MaximumAmpe)
                 {
-                    /* Close Relay here */
-                    RELAY_CLOSE(RELAY0);
+                    OverloadBit = true;
+                    /* Open Relay here */
+                    /* Ngat Ro-le */
+                    RELAY_OPEN(RELAY0);
                     /* Send SMS here */
                     strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
                     strcat(Make_Sms_String, PhoneNumber);
@@ -479,9 +503,19 @@ int main(void)
                     Delay_ms(2000);
 
                     returnValue = USART_SendCommand(sim800_USARTdrv, 0, TestString, 21);
+                    Delay_ms(1000);
                     returnValue = USART_SendCommand(sim800_USARTdrv, 0, EndOfTestString, 1);
+                    Delay_ms(1000);
                     RESET_SIM800_PARAMETER();
+                    GLCD_Print78(4, 0, "TB Qua tai!!!");
                 }
+                else
+                {
+                    /* code */
+                    /* OverloadBit = false; */
+                    /* GLCD_Clr_Line(4); */
+                }
+                
                 RESET_MODBUS_PARAMETER();
 
                 /* returnValue = USART_Communication(modBUS_USARTdrv, 1, &PowerReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
@@ -676,4 +710,27 @@ static void GetDisplayData(ValueToGet phase, char* pDisplayBuffer)
     (uint16_t)phase.ConvertedVoltage, \
     (uint16_t)phase.ConvertedAmpe, \
     getFraction(phase.ConvertedAmpe));
+}
+
+void WDG_Init(uint16_t msTimer)
+{
+    /* Using IRC 4MHz, pre-scaler by 4 => WDG CLK = 1MHz */
+    /* Set wd Counter  */
+    LPC_WDT->WDTC = (uint32_t)(msTimer) * 1000;
+    LPC_WDT->WDMOD |= 0x03;
+    /* Start WDG by writing 0xaa then 0x55 followed */
+    LPC_WDT->WDFEED = 0xAA;
+    LPC_WDT->WDFEED = 0x55;
+}
+
+void WDG_Reload(void)
+{
+    /* Start WDG by writing 0xaa then 0x55 followed will reload counter */
+    LPC_WDT->WDFEED = 0xAA;
+    LPC_WDT->WDFEED = 0x55;
+}
+
+void WDG_Disable(void)
+{
+    LPC_WDT->WDMOD = 0x00;
 }
