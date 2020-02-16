@@ -209,7 +209,7 @@ int main(void)
 
     char TestString[] = "TB:Thiet bi qua tai!";
     char EndOfTestString[1] = {0x1A};
-    char PhoneNumber[10] = "0973569162";
+    char PhoneNumber[10] = "0362992515";
     char Make_Call_String[17];
     char Make_Sms_String[23];
     uint8_t MaximumAmpe = 5;
@@ -289,10 +289,10 @@ int main(void)
     Delay_ms(2000);
 
     /* returnValue = USART_Communication(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, cmd, SIM800A_TEXT_MODE_LENGTH, OK_CR_LF); */
-    returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, SIM800A_TEXT_MODE_LENGTH);
+    /* returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, SIM800A_TEXT_MODE_LENGTH); */
     /* returnValue = USART_SIM800_VerifyReceivedData(cmd); */
-    RESET_SIM800_PARAMETER();
-    Delay_ms(2000);
+    /* RESET_SIM800_PARAMETER(); */
+    /* Delay_ms(2000); */
 
     /* strcpy(Make_Call_String, SIM800A_MAKE_CALL);
     strcat(Make_Call_String, PhoneNumber);
@@ -302,8 +302,15 @@ int main(void)
     RESET_SIM800_PARAMETER();
     Delay_ms(2000); */
 
-    GLCD_Clr_Line(1);
+    /* Append maxAmpe value to display */
     sprintf(RawMaximumAmpe, "%d", MaximumAmpe);
+    /* Append SMS message data */
+    strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
+    strcat(Make_Sms_String, PhoneNumber);
+    strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
+
+    /* Initialized succesfully */
+    GLCD_Clr_Line(1);
 
     for (int i = 0; i < 3; i++)
     {
@@ -495,12 +502,12 @@ int main(void)
                     /* Ngat Ro-le */
                     RELAY_OPEN(RELAY0);
                     /* Send SMS here */
-                    strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
-                    strcat(Make_Sms_String, PhoneNumber);
-                    strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
+                    returnValue = USART_SendCommand(sim800_USARTdrv, 0, SIM800A_TEXT_MODE, SIM800A_TEXT_MODE_LENGTH);
+                    RESET_SIM800_PARAMETER();
+                    Delay_ms(1000);
                     returnValue = USART_SendCommand(sim800_USARTdrv, 0, Make_Sms_String, SIM800A_MAKE_SMS_LENGTH);
                     RESET_SIM800_PARAMETER();
-                    Delay_ms(2000);
+                    Delay_ms(1000);
 
                     returnValue = USART_SendCommand(sim800_USARTdrv, 0, TestString, 21);
                     Delay_ms(1000);
@@ -688,7 +695,7 @@ float IEEE754_Converter(uint32_t raw)
 
 void LCD_DisplayData(uint8_t line, ValueToGet phase)
 {
-    char DisplayBuffer[20];
+    char DisplayBuffer[14];
 
     GetDisplayData(phase, DisplayBuffer);
     GLCD_Print78(line, 0, DisplayBuffer);
