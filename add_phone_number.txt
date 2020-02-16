@@ -1,0 +1,10 @@
+add phone number:
+AT+CPBW=,"[Phone_Number]",129,"User 1"
+
+read phone number:
+AT+CPBR=4
+retur: +CPBR: 4,"[Phone_Number]",129,"User 1"
+
+delete phone number:
+AT+CPBW=2
+

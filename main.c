@@ -10,6 +10,7 @@
 /* Global variables */
 char cmd[30];
 char modbus_buffer[30];
+char dummy_data[1];
 static bool USART_TX_Complete[2];
 static bool USART_RX_Complete[2];
 static bool USART_RX_Timeout[2];
@@ -209,7 +210,7 @@ int main(void)
 
     char TestString[] = "TB:Thiet bi qua tai!";
     char EndOfTestString[1] = {0x1A};
-    char PhoneNumber[10] = "0362992515";
+    char PhoneNumber[10] = "0000000000";
     char Make_Call_String[17];
     char Make_Sms_String[23];
     uint8_t MaximumAmpe = 5;
@@ -248,7 +249,7 @@ int main(void)
 
     /* Timer1 used for setting USART MODBUS RX Timeout */
     /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
-    TIMER_Init(1,50000);                  /* Configure timer1 to generate 50ms(50000us) delay */
+    TIMER_Init(1,500000);                  /* Configure timer1 to generate 500ms(500000us) delay */
     TIMER_AttachInterrupt(1,Timer1_Notification);  /* myTimerIsr_1 will be called by TIMER1_IRQn */
 
     /* Timer2 used for set 5s counter */
@@ -357,6 +358,10 @@ int main(void)
                 currentDigit = 0;
                 GLCD_Print78(5, 40, PhoneNumber);
                 GLCD_Print78(6, 48, RawMaximumAmpe);
+                /* Saving Phone number */
+                strcpy(Make_Sms_String, SIM800A_MAKE_SMS);
+                strcat(Make_Sms_String, PhoneNumber);
+                strcat(Make_Sms_String, SIM800A_MAKE_SMS_END_OF_LINE);
                 GLCD_Print78(7, 0, "Da luu!");
                 PhoneNumberSetting = false;
                 AmpeMaxSetting = false;
@@ -403,9 +408,9 @@ int main(void)
             }
         }
 
-        if (BUTTON_IS_PUSHED(PORT_0, BUT5))
+        if (BUTTON_IS_PUSHED(PORT_0, BUT6))
         {
-            while(BUTTON_IS_PUSHED(PORT_0, BUT5));
+            while(BUTTON_IS_PUSHED(PORT_0, BUT6));
             if (PhoneNumberSetting == true)
             {
                 GLCD_Print78(5, 40, PhoneNumber);
@@ -428,9 +433,9 @@ int main(void)
             }
         }
 
-        if (BUTTON_IS_PUSHED(PORT_0, BUT6))
+        if (BUTTON_IS_PUSHED(PORT_0, BUT5))
         {
-            while(BUTTON_IS_PUSHED(PORT_0, BUT6));
+            while(BUTTON_IS_PUSHED(PORT_0, BUT5));
             if (PhoneNumberSetting == true)
             {
                 GLCD_Print78(5, 40, PhoneNumber);
@@ -495,6 +500,10 @@ int main(void)
                 returnValue = USART_Communication(modBUS_USARTdrv, 1, &AmpeReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
                 phaseValue[phaseCounter].RawAmpe = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
                 phaseValue[phaseCounter].ConvertedAmpe = IEEE754_Converter(phaseValue[phaseCounter].RawAmpe);
+                RESET_MODBUS_PARAMETER();
+
+                LCD_DisplayData(phaseCounter + 1, phaseValue[phaseCounter]);
+
                 if (phaseValue[phaseCounter].ConvertedAmpe > (float)MaximumAmpe)
                 {
                     OverloadBit = true;
@@ -514,25 +523,18 @@ int main(void)
                     returnValue = USART_SendCommand(sim800_USARTdrv, 0, EndOfTestString, 1);
                     Delay_ms(1000);
                     RESET_SIM800_PARAMETER();
+                    GLCD_Clr_Line(4);
                     GLCD_Print78(4, 0, "TB Qua tai!!!");
                 }
-                else
-                {
-                    /* code */
-                    /* OverloadBit = false; */
-                    /* GLCD_Clr_Line(4); */
-                }
-                
-                RESET_MODBUS_PARAMETER();
 
                 /* returnValue = USART_Communication(modBUS_USARTdrv, 1, &PowerReadCommand[phaseCounter][0], modbus_buffer, 8, 9);
                 phaseValue[phaseCounter].RawPower = (modbus_buffer[3] << 24) | (modbus_buffer[4] << 16) | (modbus_buffer[5] << 8) | modbus_buffer[6];
                 phaseValue[phaseCounter].ConvertedPower = IEEE754_Converter(phaseValue[phaseCounter].RawPower);
                 RESET_MODBUS_PARAMETER(); */
 
-                LCD_DisplayData(phaseCounter + 1, phaseValue[phaseCounter]);
             }
 
+            /* Reset MODBUS trigger for continuing sample */
             MODBUS_Trigger = false;
         }
     }
@@ -579,7 +581,6 @@ static void USART_sim800_Callback(uint32_t event)
 
     if (event & ARM_USART_EVENT_RECEIVE_COMPLETE)
     {
-        TIMER_Stop(0);
         USART_RX_Complete[0] = true;
     }
 }
@@ -675,6 +676,7 @@ bool USART_Communication(ARM_DRIVER_USART *USARTdrv, int instance, const char *d
                 break;
             }
         }
+        returnValue = E_OK;
     }
     return returnValue;
 }
