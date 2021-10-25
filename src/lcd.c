@@ -421,8 +421,6 @@ void GLCD_PutChar_setup(uint8_t Line, uint8_t Col, uint16_t chr)
 {
     uint16_t i, j, k;
     uint16_t width_1 = 0;
-    uint8_t width = font_setup[0];
-    uint8_t height = font_setup[1];
     for (j = 4; j < (chr - 28); j++)
     {
         width_1 = width_1 + font_setup[j];
@@ -471,9 +469,8 @@ void GLCD_PutChar_setup(uint8_t Line, uint8_t Col, uint16_t chr)
 void GLCD_Printf_setup(uint8_t Line, uint8_t Col, const char *str)
 {
     uint8_t i, x;
-    uint16_t chr;
     x = Col;
-    //    chr = str;
+
     for (i = 0; str[i] != 0; i++)
     {
         if (x >= 192)
@@ -508,8 +505,6 @@ void GLCD_PutChar_prog(uint8_t Line, uint8_t Col, uint16_t chr)
 {
     uint16_t i, j, k;
     uint16_t width_1 = 0;
-    uint8_t width = font_ten_ct[0];
-    uint8_t height = font_ten_ct[1];
 
     if (chr < 28)
     {
@@ -564,9 +559,8 @@ void GLCD_PutChar_prog(uint8_t Line, uint8_t Col, uint16_t chr)
 void GLCD_Printf_prog(uint8_t Line, uint8_t Col, const char *str)
 {
     uint8_t i, x;
-    uint16_t chr;
     x = Col;
-    //    chr = str;
+
     for (i = 0; str[i] != 0; i++)
     {
         if (x >= 192)
