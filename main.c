@@ -23,6 +23,7 @@ static bool USART_TX_Complete[4];
 static char buffer_data[BUFFER_LENGTH];
 static uint32_t counterP0[6];
 static bool delay_trigger_tim3 = false;
+static bool bTimerIsStarted = false;
 /* USART Driver */
 extern ARM_DRIVER_USART Driver_USART2;
 extern ARM_DRIVER_USART Driver_USART1;
@@ -90,10 +91,22 @@ void EINT3_IRQHandler(void)
     else if (regIO0IntFallingStatus & LPC_GPIOINT_IO0_INTERRUPT_STATUS_P05_MASKED)
     {
         counterP0[0]++;
+        if (counterP0[0] >= 1000)
+        {
+            counterP0[0] = 0;
+        }
+        TIMER_Stop(1);
+        bTimerIsStarted = false;
     }
     else if (regIO0IntFallingStatus & LPC_GPIOINT_IO0_INTERRUPT_STATUS_P06_MASKED)
     {
         counterP0[1]++;
+        if (counterP0[1] >= 1000)
+        {
+            counterP0[1] = 0;
+        }
+        TIMER_Stop(1);
+        bTimerIsStarted = false;
     }
     else if (regIO0IntFallingStatus & LPC_GPIOINT_IO0_INTERRUPT_STATUS_P07_MASKED)
     {
@@ -102,10 +115,22 @@ void EINT3_IRQHandler(void)
     else if (regIO0IntFallingStatus & LPC_GPIOINT_IO0_INTERRUPT_STATUS_P08_MASKED)
     {
         counterP0[3]++;
+        if (counterP0[3] >= 1000)
+        {
+            counterP0[3] = 0;
+        }
+        TIMER_Stop(1);
+        bTimerIsStarted = false;
     }
     else if (regIO0IntFallingStatus & LPC_GPIOINT_IO0_INTERRUPT_STATUS_P09_MASKED)
     {
         counterP0[4]++;
+        if (counterP0[4] >= 1000)
+        {
+            counterP0[4] = 0;
+        }
+        TIMER_Stop(1);
+        bTimerIsStarted = false;
     }
     else
     {
@@ -153,6 +178,10 @@ void Timer0_Notification(void)
 void Timer1_Notification(void)
 {
     /* User code */
+    counterP0[0] = 0;
+    counterP0[1] = 0;
+    counterP0[3] = 0;
+    counterP0[4] = 0;
 }
 
 void Timer2_Notification(void)
@@ -178,7 +207,7 @@ int main(void)
     SystemCoreClockUpdate();
 
     /* WDG_Disable(); */
-    //WDG_Init(10000);
+    WDG_Init(10000);
 
     /* USART fucntions */
     USART_Init(&Driver_USART0, USART_0_Callback);
@@ -200,14 +229,13 @@ int main(void)
     buffer_data[BUFFER_LENGTH - 2] = '\r';
     buffer_data[BUFFER_LENGTH - 1] = '\n';
 
-    /* Timer0 generates 500ms period task */
-    TIMER_Init(0,500000);                  /* Configure timer0 to generate 500ms(500000us) delay */
+    /* Timer0 generates 200ms period task */
+    TIMER_Init(0,200000);                  /* Configure timer0 to generate 200ms(500000us) delay */
     TIMER_AttachInterrupt(0,Timer0_Notification);  /* myTimerIsr_0 will be called by TIMER0_IRQn */
     TIMER_Start(0);
 
-    /* Timer1 used for setting USART MODBUS RX Timeout */
-    /* With BDR=9600 => T= 0.104ms * 10 bits = 1.04ms for each character. */
-    TIMER_Init(1,500000);                  /* Configure timer1 to generate 500ms(500000us) delay */
+    /* Timer1 generate 60s timer */
+    TIMER_Init(1,60000000);                  /* Configure timer1 to generate 500ms(500000us) delay */
     TIMER_AttachInterrupt(1,Timer1_Notification);  /* myTimerIsr_1 will be called by TIMER1_IRQn */
 
     /* Timer2 used for set 5s counter to WDG feeding */
@@ -222,6 +250,11 @@ int main(void)
     while (1)
     {
         returnValue = E_OK;
+        if (bTimerIsStarted == false)
+        {
+            bTimerIsStarted = true;
+            TIMER_Start(1);
+        }
         if (returnValue == E_NOT_OK)
         {
             break;
